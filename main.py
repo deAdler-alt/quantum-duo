@@ -1,7 +1,7 @@
 import os, json, argparse
 from bb84 import sanity_check_bb84, run_bb84, save_qber_plot
 from vqe_h2 import run_vqe_curve, save_energy_plot
-from crypto_utils import bits_to_key_bytes, json_encrypt, json_decrypt
+from crypto_utils import bits_to_key_bytes, json_encrypt, json_decrypt, to_base64_str
 
 OUTDIR = "outputs"
 
@@ -45,23 +45,28 @@ def main():
     grid = parse_grid(args.rgrid)
     points = run_vqe_curve(grid, seed=args.seed + 1, reps=args.reps, maxiter=args.maxiter)
     for p in points:
-        print(f"R={p['R']:.2f} Å, E={p['E']:.6f} Ha")
+        print(f"R={p['R']:.2f} Å, E={p['E']:.6f} a.u.")
     e_path = os.path.join(OUTDIR, "h2_energy_curve.png")
     save_energy_plot(points, e_path)
     print(f"Saved: {e_path}")
 
-    plain = {"points": points, "unit": "Hartree"}
+    plain = {"points": points, "unit": "Relative a.u."}
     enc = json_encrypt(plain, key_bytes)
     enc_path = os.path.join(OUTDIR, "vqe_results.enc")
+    b64_path = os.path.join(OUTDIR, "vqe_results.enc.b64")
     json_path = os.path.join(OUTDIR, "vqe_results.json")
     with open(enc_path, "wb") as f:
         f.write(enc)
+    with open(b64_path, "w") as f:
+        f.write(to_base64_str(enc))
     with open(json_path, "w") as f:
         json.dump(plain, f)
     dec = json_decrypt(enc, key_bytes)
     assert dec == plain
     print(f"Saved: {enc_path}")
+    print(f"Saved: {b64_path}")
     print(f"Saved: {json_path}")
+    print("\nSample plaintext:", dec["points"][:2])
     print("\n[OK] End-to-end flow complete")
 
 if __name__ == "__main__":

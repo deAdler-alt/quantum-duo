@@ -39,12 +39,10 @@ def vqe_energy_for_R(R: float, seed: int = 1, reps: int = 2, maxiter: int = 200)
     ansatz = EfficientSU2(num_qubits=n, entanglement="full", reps=reps)
     rng = np.random.default_rng(seed)
     theta0 = rng.standard_normal(ansatz.num_parameters) * 0.1
-
     def objective(theta: np.ndarray) -> float:
         qc: QuantumCircuit = ansatz.assign_parameters(theta)
         state = Statevector.from_instruction(qc)
         return expectation(H, state)
-
     res = minimize(objective, theta0, method="L-BFGS-B", options={"maxiter": maxiter})
     return float(res.fun)
 
@@ -72,7 +70,7 @@ def save_energy_plot(points, path: str):
     plt.plot(xs, ys, marker="o")
     plt.scatter([xs[i_min]], [ys[i_min]], s=70)
     plt.xlabel("Bond length R (Å)")
-    plt.ylabel("Energy (Hartree)")
+    plt.ylabel("Relative energy (a.u.)")
     plt.title("H₂ potential energy curve (VQE)")
     plt.grid(True)
     plt.tight_layout()

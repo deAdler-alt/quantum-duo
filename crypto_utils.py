@@ -1,4 +1,4 @@
-import numpy as np, json
+import numpy as np, json, base64
 
 def bits_to_key_bytes(bits):
     L = len(bits) - (len(bits) % 8)
@@ -17,8 +17,10 @@ def xor_bytes(data: bytes, key: bytes) -> bytes:
     k = np.frombuffer(key, dtype=np.uint8)
     d = np.frombuffer(data, dtype=np.uint8)
     out = np.empty_like(d)
-    for i in range(len(d)):
-        out[i] = d[i] ^ k[i % len(k)]
+    n = len(d)
+    m = len(k)
+    for i in range(n):
+        out[i] = d[i] ^ k[i % m]
     return out.tobytes()
 
 def json_encrypt(obj, key_bytes: bytes) -> bytes:
@@ -28,3 +30,9 @@ def json_encrypt(obj, key_bytes: bytes) -> bytes:
 def json_decrypt(enc: bytes, key_bytes: bytes):
     data = xor_bytes(enc, key_bytes).decode("utf-8")
     return json.loads(data)
+
+def to_base64_str(b: bytes) -> str:
+    return base64.b64encode(b).decode("ascii")
+
+def from_base64_str(s: str) -> bytes:
+    return base64.b64decode(s.encode("ascii"))
