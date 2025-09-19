@@ -10,11 +10,11 @@ def main():
     print("== Sanity check: Qiskit simulator ==")
     print(sanity_check_bb84())
 
-    print("\n== BB84 (placeholder) ==")
-    bb = run_bb84()
+    print("\n== BB84 (real) ==")
+    bb = run_bb84(n=1024, p_eve=0.25, p_noise=0.0, seed=1, steps=8)
     save_qber_plot(bb["p_eves"], bb["qbers"], os.path.join(OUTDIR, "qber_plot.png"))
-    print(f"QBER(no attack) ~ {bb['qber_no_eve']}, QBER(full attack) ~ {bb['qber_full_eve']}")
-
+    print(f"QBER(no attack) = {bb['qber_no_eve']:.3f}, QBER(full attack) = {bb['qber_full_eve']:.3f}")
+        
     if bb["qber_no_eve"] > QBER_THRESHOLD:
         print("[ABORT] Channel insecure (placeholder).")
         return

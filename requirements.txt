@@ -2,4 +2,5 @@ qiskit
 qiskit-aer
 numpy
 matplotlib
-
+qiskit-nature
+pyscf
