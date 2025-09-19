@@ -33,6 +33,12 @@ def expectation(op: SparsePauliOp, state: Statevector) -> float:
     val = np.vdot(v, mat @ v)
     return float(np.real(val))
 
+def exact_energy_for_R(R: float) -> float:
+    H = build_qubit_hamiltonian(R)
+    mat = H.to_matrix(sparse=False)
+    w, _ = np.linalg.eigh(mat)
+    return float(np.min(np.real(w)))
+
 def vqe_energy_for_R(R: float, seed: int = 1, reps: int = 2, maxiter: int = 200) -> float:
     H = build_qubit_hamiltonian(R)
     n = H.num_qubits
@@ -49,12 +55,15 @@ def vqe_energy_for_R(R: float, seed: int = 1, reps: int = 2, maxiter: int = 200)
 def run_vqe_curve(R_list: List[float], seed: int = 1, reps: int = 2, maxiter: int = 200) -> List[Dict[str, float]]:
     out: List[Dict[str, float]] = []
     for R in R_list:
-        E = vqe_energy_for_R(R, seed=seed, reps=reps, maxiter=maxiter)
-        out.append({"R": float(nearest_R_key(R)), "E": float(E)})
+        rkey = float(nearest_R_key(R))
+        e_exact = exact_energy_for_R(rkey)
+        e_vqe = vqe_energy_for_R(rkey, seed=seed, reps=reps, maxiter=maxiter)
+        err = float(abs(e_vqe - e_exact))
+        out.append({"R": rkey, "E_vqe": e_vqe, "E_exact": e_exact, "error": err})
     seen = {}
     dedup = []
     for p in out:
-        k = (p["R"], round(p["E"], 6))
+        k = (p["R"], round(p["E_vqe"], 6), round(p["E_exact"], 6))
         if k in seen:
             continue
         seen[k] = True
@@ -64,14 +73,29 @@ def run_vqe_curve(R_list: List[float], seed: int = 1, reps: int = 2, maxiter: in
 
 def save_energy_plot(points, path: str):
     xs = [p["R"] for p in points]
-    ys = [p["E"] for p in points]
-    i_min = min(range(len(ys)), key=lambda i: ys[i])
+    y_vqe = [p["E_vqe"] for p in points]
+    y_exact = [p["E_exact"] for p in points]
+    i_min = min(range(len(y_vqe)), key=lambda i: y_vqe[i])
     plt.figure()
-    plt.plot(xs, ys, marker="o")
-    plt.scatter([xs[i_min]], [ys[i_min]], s=70)
+    plt.plot(xs, y_vqe, marker="o", label="VQE")
+    plt.plot(xs, y_exact, marker="s", label="Exact")
+    plt.scatter([xs[i_min]], [y_vqe[i_min]], s=70)
     plt.xlabel("Bond length R (Å)")
     plt.ylabel("Relative energy (a.u.)")
-    plt.title("H₂ potential energy curve (VQE)")
+    plt.title("H₂ potential energy curve")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path)
+
+def save_error_plot(points, path: str):
+    xs = [p["R"] for p in points]
+    errs = [p["error"] for p in points]
+    plt.figure()
+    plt.plot(xs, errs, marker="o")
+    plt.xlabel("Bond length R (Å)")
+    plt.ylabel("|E_VQE − E_exact| (a.u.)")
+    plt.title("VQE absolute error vs bond length")
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(path)

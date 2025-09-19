@@ -1,6 +1,6 @@
 import os, json, argparse
 from bb84 import sanity_check_bb84, run_bb84, save_qber_plot
-from vqe_h2 import run_vqe_curve, save_energy_plot
+from vqe_h2 import run_vqe_curve, save_energy_plot, save_error_plot
 from crypto_utils import bits_to_key_bytes, json_encrypt, json_decrypt, to_base64_str
 
 OUTDIR = "outputs"
@@ -41,14 +41,17 @@ def main():
     key_bytes = bits_to_key_bytes(bb["key_bits"])
     print(f"Key bytes length: {len(key_bytes)}")
 
-    print("\n== VQE H2 curve (real) ==")
+    print("\n== VQE H2 curve (real + exact baseline) ==")
     grid = parse_grid(args.rgrid)
     points = run_vqe_curve(grid, seed=args.seed + 1, reps=args.reps, maxiter=args.maxiter)
     for p in points:
-        print(f"R={p['R']:.2f} Å, E={p['E']:.6f} a.u.")
+        print(f"R={p['R']:.2f} Å, E_vqe={p['E_vqe']:.6f} a.u., E_exact={p['E_exact']:.6f} a.u., error={p['error']:.6e}")
     e_path = os.path.join(OUTDIR, "h2_energy_curve.png")
+    err_path = os.path.join(OUTDIR, "h2_error_curve.png")
     save_energy_plot(points, e_path)
+    save_error_plot(points, err_path)
     print(f"Saved: {e_path}")
+    print(f"Saved: {err_path}")
 
     plain = {"points": points, "unit": "Relative a.u."}
     enc = json_encrypt(plain, key_bytes)
