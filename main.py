@@ -1,5 +1,9 @@
 import os, json, argparse, csv
-from bb84 import sanity_check_bb84, run_bb84, save_qber_plot
+from bb84 import (
+    sanity_check_bb84, run_bb84, save_qber_plot,
+    run_qber_heatmap, save_qber_heatmap,
+    bb84_walkthrough, save_walkthrough_csv
+)
 from vqe_h2 import run_vqe_curve, save_energy_plot, save_error_plot
 from crypto_utils import (
     bits_to_key_bytes, derive_key_sha256, has_aes,
@@ -11,6 +15,12 @@ OUTDIR = "outputs"
 
 def parse_grid(s):
     return [float(x) for x in s.split(",") if x.strip()]
+
+def parse_range3(s, default_min, default_max, default_steps):
+    parts = [x.strip() for x in s.split(",") if x.strip()]
+    if len(parts) == 3:
+        return float(parts[0]), float(parts[1]), int(parts[2])
+    return default_min, default_max, default_steps
 
 def write_csv(points, path):
     with open(path, "w", newline="") as f:
@@ -63,7 +73,6 @@ img{{max-width:100%;height:auto;border-radius:12px;border:1px solid #eee}}
       <li>encryption = {artifacts['enc_mode']}</li>
     </ul>
   </div>
-
   <div class="card">
     <h2>BB84 summary</h2>
     <p>QBER(no attack) = <b>{bb['qber_no_eve']:.3f}</b>, threshold = <b>{threshold}</b></p>
@@ -108,6 +117,8 @@ img{{max-width:100%;height:auto;border-radius:12px;border:1px solid #eee}}
     <li><a href="qber_plot.png">qber_plot.png</a></li>
     <li><a href="h2_energy_curve.png">h2_energy_curve.png</a></li>
     <li><a href="h2_error_curve.png">h2_error_curve.png</a></li>
+    <li><a href="qber_heatmap.png">qber_heatmap.png</a></li>
+    <li><a href="bb84_walkthrough.csv">bb84_walkthrough.csv</a></li>
   </ul>
 </div>
 
@@ -129,6 +140,11 @@ def main():
     ap.add_argument("--reps", type=int, default=2)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--xor", action="store_true")
+    ap.add_argument("--heatmap", action="store_true")
+    ap.add_argument("--hm_pe", type=str, default="0.0,1.0,6")
+    ap.add_argument("--hm_pn", type=str, default="0.0,0.2,6")
+    ap.add_argument("--hm_avg", type=int, default=1)
+    ap.add_argument("--demo_bits", type=int, default=0)
     args = ap.parse_args()
 
     print("== Sanity check: Qiskit simulator ==")
@@ -147,6 +163,23 @@ def main():
     if current_qber is None or current_qber > threshold:
         print(f"[ABORT] Channel insecure: QBER={current_qber}, threshold={threshold}")
         return
+
+    if args.demo_bits > 0:
+        walk = bb84_walkthrough(n=args.demo_bits, p_eve=args.eve, p_noise=args.noise, seed=args.seed)
+        walk_path = os.path.join(OUTDIR, "bb84_walkthrough.csv")
+        save_walkthrough_csv(walk, walk_path)
+        print(f"Saved: {walk_path}")
+        print(f"Walkthrough QBER = {walk['qber'] if walk['qber'] is not None else 'None'}")
+
+    if args.heatmap:
+        pe_min, pe_max, pe_steps = parse_range3(args.hm_pe, 0.0, 1.0, 6)
+        pn_min, pn_max, pn_steps = parse_range3(args.hm_pn, 0.0, 0.2, 6)
+        hm = run_qber_heatmap(n=args.n, pe_min=pe_min, pe_max=pe_max, pe_steps=int(pe_steps),
+                              pn_min=pn_min, pn_max=pn_max, pn_steps=int(pn_steps),
+                              seed=args.seed, avg=args.hm_avg)
+        hm_path = os.path.join(OUTDIR, "qber_heatmap.png")
+        save_qber_heatmap(hm["p_eves"], hm["p_noises"], hm["qber"], hm_path)
+        print(f"Saved: {hm_path}")
 
     raw_key = bits_to_key_bytes(bb["key_bits"])
     key32 = derive_key_sha256(raw_key) if has_aes() else raw_key
@@ -182,9 +215,9 @@ def main():
         dec = json_decrypt_xor(enc, raw_key)
     assert dec["points"] == points
 
-    json_path = os.path.join(OUTDIR, "points.csv")
-    write_csv(points, json_path)
-    print(f"Saved: {json_path}")
+    csv_path = os.path.join(OUTDIR, "points.csv")
+    write_csv(points, csv_path)
+    print(f"Saved: {csv_path}")
 
     artifacts = {
         "enc_mode": enc_mode,
