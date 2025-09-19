@@ -3,4 +3,4 @@ qiskit-aer
 numpy
 matplotlib
 scipy
-
+cryptography
